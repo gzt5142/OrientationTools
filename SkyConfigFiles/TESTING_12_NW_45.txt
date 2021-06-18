@@ -1,0 +1,19 @@
+distribution:  TESTING
+sun elevation: 45
+sun azimuth:   315
+sample points: 12
+
+Format of sample points: azimuth,elevation,weight (weights sum to 1.0)
+
+315,45,0.23
+0,30,0.07
+60,30,0.07
+90,30,0.07
+120,30,0.07
+150,30,0.07
+180,30,0.07
+210,30,0.07
+240,30,0.07
+270,30,0.07
+300,30,0.07
+330,30,0.07
