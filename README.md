@@ -1,19 +1,20 @@
-## Surface Normal Tools
+## Orientation Tools
 
 
-### Python Toolbox for ArcGIS Pro: Surface Normal Vectors
+### Python Toolbox for ArcGIS Pro: Surface Orientation Toolbox
 
 * __Study DEM__ -- Tool to process DEM inputs and generate the multi-band raster dataset representing the surface normal 
   vectors used by all of the tools listed below.  Surface normal vectors are derived from gradient.  Two methods are 
   offered as options for calculating gradient.  Horn is the default, which will generate vectors which agree with 
-  Esri's hillshade output best. 
-* _<u>Primitives</u>_ ToolSet
-    * __Hello World__ -- A demo tool to show how logging works, and to demonstrate how `ReliefTool()` is sub-classed. It
-      does no work on its own; serves only as a coding example.
-    * __Lambertian Hillshade__ -- Computes Hillshade by Lambert's cosine emission law (i.e. light vector is dotted with
-      the surface normal vector). Output in range from -1.0 to 1.0 inclusive.
-    * __Cast Shadows__ -- This is a line-of-sight tool rather than a surface-normal tool. Models the casting of shadows
-      on the terrain by tracing rays from each point to the modeled light source.
+  Esri's hillshade output best. The output from this tool should be placed in a geodatabase.  It will be a 4-band raster,
+  with the bands being:
+    * DEM -- A copy of the elevation data
+    * Nx -- The X component of the surface normal vector
+    * Ny -- The Y component of the surface normal vector
+    * Nz -- The Z component of the surface normal vector
+
+  The output from this tool will be input for the following tools: 
+  
 * _<u>Shaded Relief</u>_ ToolSet
     * __Traditional Hillshade__ -- Produces a hillshade layer similar to that produced by other major players (Esri,
       GDAL, GRASS, etc). Output is unsigned integers from the range 0 to 255. All negative values from the Lambertian
@@ -36,8 +37,6 @@
         A style file is included in the repository which defines an '80-20' and a '70-30' color ramp for soft shaded
         scenes using this tool.  Ensure your stretch type is 'Min-Max' with the minimum set to zero and the maximum 
         set to one. 
-    * __Soft Sky Model__ -- Implementation of the Sky Model method using soft hillshade rather than the traiditional
-      hillshade tool. Output as float64 with brightness values ranging 0 to 1. 
 * _<u>Bumpmaps</u>_ ToolSet
     * __NLCD_Bump_Mapper__ -- Configures and applies bump-map tiles according to a land use raster mask. The 
       use-case was built around land cover, which is why *NLCD* terminology is used. 
@@ -49,7 +48,7 @@
 
 Options for all Surface Normal Tools:
 * Near the top of the `SurfaceNormal.pyt` file is a declaration for global variable `DEBUG`. If this is
-  set to <u>True</u>, debug information is accumulated in `SurfaceNormal.log` in the same folder/directory
+  set to <u>True</u>, debug information is accumulated in a log file in the same folder/directory
   as the toolbox source file.
   
 
