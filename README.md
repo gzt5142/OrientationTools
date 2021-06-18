@@ -47,7 +47,7 @@
 
 
 Options for all Surface Normal Tools:
-* Near the top of the `SurfaceNormal.pyt` file is a declaration for global variable `DEBUG`. If this is
+* Near the top of the `SurfaceOrientationToolbox.pyt` file is a declaration for global variable `DEBUG`. If this is
   set to <u>True</u>, debug information is accumulated in a log file in the same folder/directory
   as the toolbox source file.
   
