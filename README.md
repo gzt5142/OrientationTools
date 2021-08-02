@@ -50,14 +50,25 @@ Options for all Surface Normal Tools:
   set to <u>True</u>, debug information is accumulated in a log file in the same folder/directory
   as the toolbox source file.
   
+### Bump Maps
+The bump-mapping tool searches the `BumpMaps` folder for the tiles it offers for you to use in texturing 
+a scene. You can add bump maps to this foldor *prior* to running the tool to give yourself more options. 
+You can create your own bump-map tiles, or download most any normal map from on-line archives. 
+The libraries at https://polyhaven.com/textures and https://ambientcg.com/ are popular repositories of 
+public-domain textures. 
 
-### Support Files
-* __`LambertColorRamps.stylx`__ -- ArcGIS Pro style file for the color ramps used for soft hillshades. 
-* __`NLCD.clr`__ -- Color definitions for National Land Cover Database rasters.
-* __`LCCS.clr`__ -- Color definitions for Copernicus land cover rasters.
+### Sky Config Files
+The configuration files in the `SkyConfigFiles` folder provide the options for sky configurations in the
+Sky Model tool.  If you want to create your own sky configurations, you can add them as a text file in this
+folder to have them included as an option for the tool. 
 
 ### Jupyter Notebooks
 The `SketchNotebooks` folder includes a few Jupyter notebooks which capture some of the algorithms
 used in the toolbox.  Some of these use the Crater Lake DEM (as GeoTIFF) dataset.  You'll need to 
 download your own copy of that dataset from https://shadedrelief.com/SampleElevationModels/ and adjust
 the path to this TIFF in the notebook. 
+
+### Support Files
+* __`LambertColorRamps.stylx`__ -- ArcGIS Pro style file for the color ramps used for soft hillshades. 
+* __`NLCD.clr`__ -- Color definitions for National Land Cover Database rasters.
+* __`LCCS.clr`__ -- Color definitions for Copernicus land cover rasters.
