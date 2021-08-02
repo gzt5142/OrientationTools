@@ -9,7 +9,7 @@
   Esri's hillshade output best. The output from this tool should be placed in a geodatabase.  It will be a 4-band raster,
   with the bands being:
     * DEM -- A copy of the elevation data
-    * Nx -- The X component of the surface normal vector
+    * $N_x$ -- The X component of the surface normal vector
     * Ny -- The Y component of the surface normal vector
     * Nz -- The Z component of the surface normal vector
 
@@ -42,7 +42,7 @@
       use-case was built around land cover, which is why *NLCD* terminology is used. 
     * __Prep_NLCD_Bumpmap_Mask__ -- This tool helps to clip, resample, and re-project NLCD or similar raster data to
       match the surface normal dataset. The bump-mapper expects the NLCD masking raster to have same cell size, extent,
-      dimensions, and projection. 
+      dimensions, and projection. This tool simplifies that process. 
       
 
 
@@ -56,3 +56,9 @@ Options for all Surface Normal Tools:
 * __`LambertColorRamps.stylx`__ -- ArcGIS Pro style file for the color ramps used for soft hillshades. 
 * __`NLCD.clr`__ -- Color definitions for National Land Cover Database rasters.
 * __`LCCS.clr`__ -- Color definitions for Copernicus land cover rasters.
+
+### Jupyter Notebooks
+The `SketchNotebooks` folder includes a few Jupyter notebooks which capture some of the algorithms
+used in the toolbox.  Some of these use the Crater Lake DEM (as GeoTIFF) dataset.  You'll need to 
+download your own copy of that dataset from https://shadedrelief.com/SampleElevationModels/ and adjust
+the path to this TIFF in the notebook. 
