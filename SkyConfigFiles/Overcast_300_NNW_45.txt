@@ -1,6 +1,6 @@
 distribution:  OVERCAST
 sun elevation: 45
-sun azimuth:   315
+sun azimuth:   335
 sample points: 300
 
 Format of sample points: azimuth,elevation,weight (weights sum to 1.0)
