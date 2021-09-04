@@ -9,8 +9,6 @@ import csv
 
 from os.path import splitext, dirname, basename
 from os import listdir
-from math import pi as PI
-from math import sin, cos
 from datetime import date
 
 from PIL import Image
@@ -18,10 +16,10 @@ import logging
 from logging.handlers import RotatingFileHandler
 import arcpy
 
-from trf import surface, utils, shader
+from trf import surface, utils, shader, shadow
 # GLOBALS:
 # Enabling DEBUG will cause logging messages to be sent to a file handler as well as the arcpy message queue.
-DEBUG = False
+DEBUG = True
 
 
 # Pre-amble -- used by all tools...
@@ -45,7 +43,8 @@ class ArcPyPassThru(logging.Handler):
         if record.levelno >= logging.INFO:
             arcpy.AddMessage(msg)
 
-def initializeLoggers(a, l):
+
+def initializeLoggers(a, lgr):
     """
     File-level logger instantiated.  this is done inside a function so as to keep the logger variable out of
     global scope.  If anybody wants to use this logger, I am compelling them to do this:
@@ -56,11 +55,12 @@ def initializeLoggers(a, l):
     if not logger_.handlers:
         logger_.addHandler(a)
         if DEBUG:
-            logger_.addHandler(l)
+            logger_.addHandler(lgr)
             logger_.setLevel(logging.DEBUG)
         else:
             logger_.setLevel(logging.ERROR)
         logger_.debug(f"Toolbox Loaded: {date.today()}")
+
 
 # Leaving these handlers in global scope so that various classes can use them
 # to create their own loggers if they want.
@@ -102,7 +102,6 @@ class Toolbox(object):
             NLCD_Bump_Mapper,
             Prep_NLCD_Bumpmap_Mask
         ]
-
 
 
 class ReliefTool(object):
@@ -400,13 +399,14 @@ class Traditional_Hillshade(ReliefTool):
 
         if argv['shadows'].value == True:
             arcpy.SetProgressorLabel("Modeling Shadows...")
+            self.LOG.debug(f"Shadows ...")
             elevArray = arcpy.RasterToNumPyArray(inputDEM + r"\DEM")
-            shadowArray = castShadows_ShadowLine(elevArray,
+            shadowArray = shadow.shadowLine(elevArray,
                                                  argv['lightAz'].value,
                                                  argv['lightEl'].value,
                                                  demInfo.meanCellWidth
                                                  )
-            hs[shadowArray == 0] = 0
+            clamped[shadowArray > 0] = 0
         arcpy.SetProgressor("default", "Writing Output to {} ...".format(basename(argv['output'].valueAsText)))
         self.LOG.debug("Writing Outputs...")
         outRaster = arcpy.NumPyArrayToRaster(clamped, tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
@@ -461,13 +461,13 @@ class Soft_Hillshade(ReliefTool):
             self.LOG.debug("Casting Shadows...")
             arcpy.SetProgressorLabel("Casting Shadows...")
             elevArray = arcpy.RasterToNumPyArray(inputDEM + r"\DEM")
-            shadowArray = castShadows_ShadowLine(elevArray,
+            shadowArray = shadow.shadowLine(elevArray,
                                                  argv['lightAz'].value,
                                                  argv['lightEl'].value,
                                                  demInfo.meanCellWidth
                                                  )
 
-            hs[shadowArray == 0] *= 0.5
+            hs[shadowArray > 0] *= 0.5
 
         arcpy.SetProgressor("default", "Writing Output to {} ...".format(basename(argv['output'].valueAsText)))
         self.LOG.debug("Writing Outputs...")
@@ -554,22 +554,22 @@ class Sky_Tool(ReliefTool):
             arcpy.SetProgressorLabel(f"Light {i} of {len(lightList)}:  Azimuth={azimuth}, Elevation={elev}")
             arcpy.SetProgressorPosition(i)
 
-            shadow = True
+            castshadow = True
             shade = True
             if (shade_shadow == "Shade & Shadow"):
                 shade = True
-                shadow = True
+                castshadow = True
             if (shade_shadow == "Shadow Only"):
                 shade = False
-                shadow = True
+                castshadow = True
             if (shade_shadow == "Shade Only"):
                 shade = True
-                shadow = False
+                castshadow = False
 
-            if (shadow):
-                shadowArray = castShadows_ShadowLine(DEMarray, float(azimuth), float(elev),  demInfo.meanCellWidth )
+            if (castshadow):
+                shadowArray = shadow.shadowLine(DEMarray, float(azimuth), float(elev),  demInfo.meanCellWidth )
             else:
-                shadowArray = np.ones(DEMarray.shape)
+                shadowArray = np.zeros(DEMarray.shape)
 
             if (shade):
                 hs = shader.lambert(N, L)
@@ -579,13 +579,13 @@ class Sky_Tool(ReliefTool):
 
             if (clampOutput):
                 hs[hs<=0] = 0
-                hs[shadowArray==0] = 0
+                hs[shadowArray > 0] = 0
                 hs *= 255.0
                 outputArray = outputArray + (hs * float(wt))
 
             else:
                 hs = (hs + 1) / 2
-                hs[shadowArray == 0] *= 0.5
+                hs[shadowArray > 0] *= 0.5
                 outputArray = outputArray + (hs * float(wt))
         self.LOG.debug(f"Processed {i+1} light vectors.")
         return outputArray
@@ -892,98 +892,3 @@ def getUniqueValues(P):
         return np.unique(a.ravel()).tolist()
     else:
         return []
-
-
-def castShadows_ShadowLine(d, az, el, cellwidth):
-    A = np.ones(d.shape)
-    S = utils.lightVector(az, el)
-
-    # X,Y as geographic coordinates are not the same as X,Y in numpy arrays.
-    # switch to row/col names for numpy manipulations to save sanity.
-    lineMax = A.shape[0] - 1
-    colMax = A.shape[1] - 1
-
-    del_col = S[0]
-    del_row = -S[1]
-    del_H = S[2]
-
-    shadowLine = np.pad(d, 1, 'edge')
-
-    # The counters increment or decrement based on the dominant light direction.
-    # I am not fiddling with the math to get those iterables .... Using if statements to run an unrolled
-    # bit of code depending on dominant lighting direction.  This is ugly, but works.  TODO: generalize the
-    # formula to use iterables with the right sign.
-    if (az <= 45.0 or az > 315.0):
-        dH_drow = abs(del_H / del_row) * cellwidth
-        p = abs(del_col / del_row)
-
-        for line in range(1, lineMax):
-            dem = d[line - 1, :]
-            n = shadowLine[line - 1, 1:-1]
-            sl = shadowLine[line, 1:-1]
-            a = A[line - 1]
-            if del_col <= 0:
-                nw = shadowLine[line - 1, :-2]
-            else:
-                nw = shadowLine[line - 1, 2:]
-            tstHeights = (n * (1 - p)) + (nw * (p)) - dH_drow
-
-            sl[dem < tstHeights] = tstHeights[dem < tstHeights]
-            a[dem < tstHeights] = 0
-
-    if (225 < az <= 315):
-        dH_dcol = abs(del_H / del_col) * cellwidth
-        p = abs(del_row / del_col)
-
-        for col in range(1, colMax):
-            dem = d[:, col - 1]
-            w = shadowLine[1:-1, col - 1]
-            sl = shadowLine[1:-1, col]
-            a = A[:, col - 1]
-            if del_row <= 0:
-                nw = shadowLine[:-2, col - 1]
-            else:
-                nw = shadowLine[2:, col - 1]
-            tstHeights = (w * (1 - p)) + (nw * (p)) - dH_dcol
-
-            sl[dem < tstHeights] = tstHeights[dem < tstHeights]
-            a[dem < tstHeights] = 0
-
-    if (135 < az <= 225):
-        dH_drow = abs(del_H / del_row) * cellwidth
-        p = abs(del_col / del_row)
-
-        for line in range(lineMax, 0, -1):
-            dem = d[line, :]
-            s = shadowLine[line + 2, 1:-1]
-            sl = shadowLine[line + 1, 1:-1]
-            a = A[line]
-            if del_col <= 0:
-                sw = shadowLine[line + 2, :-2]
-            else:
-                sw = shadowLine[line + 2, 2:]
-
-            tstHeights = (s * (1 - p)) + (sw * (p)) - dH_drow
-
-            sl[dem < tstHeights] = tstHeights[dem < tstHeights]
-            a[dem < tstHeights] = 0
-
-    if (45 < az <= 135):
-        dH_dcol = abs(del_H / del_col) * cellwidth
-        p = abs(del_row / del_col)
-
-        for col in range(colMax, 0, -1):
-            dem = d[:, col]
-            e = shadowLine[1:-1, col + 2]
-            sl = shadowLine[1:-1, col + 1]
-            a = A[:, col - 1]
-            if del_row <= 0:
-                ne = shadowLine[:-2, col + 2]
-            else:
-                ne = shadowLine[2:, col + 2]
-            tstHeights = (e * (1 - p)) + (ne * (p)) - dH_dcol
-
-            sl[dem < tstHeights] = tstHeights[dem < tstHeights]
-            a[dem < tstHeights] = 0
-
-    return A
