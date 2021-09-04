@@ -661,10 +661,14 @@ class Bump_Tool(ReliefTool):
         :param t:
         :return:
         """
-        bmMaster = np.zeros(extentShape)
-        bmMaster[2, :,:] = 1.0 # all vectors in the bump-map master are now [0,0,1]
         logger = logging.getLogger(splitext(basename(__file__))[0])
         logger.debug("Consolidating bump maps...")
+
+        bmMaster = np.zeros(extentShape)
+        bmMaster[2, :,:] = 1.0 # all vectors in the bump-map master are now [0,0,1]
+        logger.debug("bmMaster shape is {}".format(bmMaster.shape))
+        logger.debug("NLCD shape is {}".format(nlcdArray.shape))
+
         pathPrefix = dirname(__file__) + "\\BumpMaps\\"
         arcpy.SetProgressor("step", "Tiling Bump Map:", 0, len(t)+1, 1)
         for (count, row) in enumerate(t):
@@ -689,13 +693,11 @@ class Bump_Tool(ReliefTool):
             Bm = Bm[0:x, 0:y, 0:3] # discard alpha channel, if present
             B = self.reScale(Bm)
             B = np.moveaxis(B, 2, 0) ##<<<<< change from (row,col,band) to (band,row,col), to match bmMaster.
-
-            logger.debug("bmMaster shape is {}".format(bmMaster.shape))
-            logger.debug("nlcd shape is {}".format(nlcdArray.shape))
             logger.debug("B shape is {}".format(B.shape))
-            logger.debug("Bm shape is {}".format(Bm.shape))
+            (x,y) = nlcdArray.shape
+            n = np.broadcast_to(nlcdArray, (3, x, y))
+            bmMaster[n == maskValue] = B[n == maskValue]
 
-            bmMaster[nlcdArray == maskValue] = B[nlcdArray == maskValue]
         logger.debug("Master Bump Map Assembled... ")
         return  bmMaster
 
@@ -816,7 +818,6 @@ class NLCD_Bump_Mapper(Bump_Tool):
         surfaceNormals = self.readVectorArray(inputDEM)
 
         nlcd = arcpy.RasterToNumPyArray(argv['NLCD'].valueAsText)
-
         nlcdInfo = arcpy.Describe(argv['NLCD'].valueAsText)
 
         ## nlcd raster must have same geometry and projection as the surface dataset. . .
@@ -825,9 +826,10 @@ class NLCD_Bump_Mapper(Bump_Tool):
 
         L = utils.lightVector(argv['lightAz'].value, argv['lightEl'].value)
 
-        xDim = min(surfaceNormals.shape[0], nlcd.shape[0])
-        yDim = min(surfaceNormals.shape[1], nlcd.shape[1])
+        xDim = min(surfaceNormals.shape[1], nlcd.shape[0])
+        yDim = min(surfaceNormals.shape[2], nlcd.shape[1])
         nlcd = nlcd[0:xDim, 0:yDim]
+        self.LOG.debug("NLCD read from {}, with shape {}".format(argv['NLCD'].valueAsText, nlcd.shape))
 
         bmMaster = self.consolidateBumpMaps(surfaceNormals.shape, nlcd, argv['lc_table'].values)
 
