@@ -9,8 +9,6 @@ import csv
 
 from os.path import splitext, dirname, basename
 from os import listdir
-from math import pi as PI
-from math import sin, cos
 from datetime import date
 
 from PIL import Image
@@ -18,9 +16,10 @@ import logging
 from logging.handlers import RotatingFileHandler
 import arcpy
 
+from trf import surface, utils, shader, shadow
 # GLOBALS:
 # Enabling DEBUG will cause logging messages to be sent to a file handler as well as the arcpy message queue.
-DEBUG = False
+DEBUG = True
 
 
 # Pre-amble -- used by all tools...
@@ -44,7 +43,8 @@ class ArcPyPassThru(logging.Handler):
         if record.levelno >= logging.INFO:
             arcpy.AddMessage(msg)
 
-def initializeLoggers(a, l):
+
+def initializeLoggers(a, lgr):
     """
     File-level logger instantiated.  this is done inside a function so as to keep the logger variable out of
     global scope.  If anybody wants to use this logger, I am compelling them to do this:
@@ -55,11 +55,12 @@ def initializeLoggers(a, l):
     if not logger_.handlers:
         logger_.addHandler(a)
         if DEBUG:
-            logger_.addHandler(l)
+            logger_.addHandler(lgr)
             logger_.setLevel(logging.DEBUG)
         else:
             logger_.setLevel(logging.ERROR)
         logger_.debug(f"Toolbox Loaded: {date.today()}")
+
 
 # Leaving these handlers in global scope so that various classes can use them
 # to create their own loggers if they want.
@@ -101,7 +102,6 @@ class Toolbox(object):
             NLCD_Bump_Mapper,
             Prep_NLCD_Bumpmap_Mask
         ]
-
 
 
 class ReliefTool(object):
@@ -233,8 +233,9 @@ class ReliefTool(object):
         except IOError as ex:
             self.LOG.exception("Could Not Read Surface Normal Data")
             raise ex
-        S = np.stack([Nx, Ny, Nz], 2)
+        S = np.stack([Nx, Ny, Nz], 0)
         return S
+
     def execute(self, parameters, messages):
         if DEBUG:
             arcpy.AddMessage("DEBUG logfile available in {}".format(basename(logfileHandler.baseFilename)))
@@ -249,7 +250,6 @@ class Hello_World(ReliefTool):
         self.description = self.__doc__
         self.category = "Primitives"
 
-
     def execute(self, parameters, messages):
         super().execute(parameters, messages)
         argv = {p.name: p for p in parameters}
@@ -261,7 +261,6 @@ class Hello_World(ReliefTool):
 class Study_DEM(ReliefTool):
     """
     Processes a DEM to create a multi-band raster dataset representing the X,Y,Z components of the surface normal vectors.
-
     """
     def __init__(self):
         super().__init__(toolname=__class__.__name__)
@@ -277,15 +276,7 @@ class Study_DEM(ReliefTool):
             parameterType="Required",
             direction="Input"
         )
-        gradientMethod = arcpy.Parameter(
-            displayName="Gradient Algorithm",
-            name='gradient',
-            datatype="GPString",
-            parameterType="Optional",
-            direction="Input"
-        )
-        gradientMethod.value = "Horn"
-        gradientMethod.filter.list = ["Horn", "Ritter"]
+
         outputDataSet = arcpy.Parameter(
             displayName="Output",
             name="output",
@@ -293,7 +284,7 @@ class Study_DEM(ReliefTool):
             parameterType="Required",
             direction="Output"
         )
-        return [inputDEM, gradientMethod, outputDataSet]
+        return [inputDEM, outputDataSet]
 
 
     def updateMessages(self, parameters):
@@ -328,63 +319,13 @@ class Study_DEM(ReliefTool):
         arcpy.SetProgressorLabel("Calculating Gradient...")
         self.LOG.debug("Shape of elevation data: {}".format(elevArray.shape))
 
-
-        # Computing surface normals, like computing slope and aspect, requires that we measure gradient along the
-        # X and Y directions.  This is dz/dx (change in z per step x) and dz/dy (change in z per y). Change in z
-        # per unit z is one.
-        #
-        # +-------+-------+-------+
-        # |       |       |       |
-        # |   a   |   b   |   c   |     Note: variable name dx means dz/dx;  dy means dz/dy
-        # |       |       |       |
-        # +-------+-------+-------+     To measure dx and dy for the pixel at 'e', we have two options:
-        # |       |       |       |          RITTER:
-        # |   d   |   e   |   f   |          dx = (d - f ) / (2 * cellsize)
-        # |       |       |       |          dy = (h - b) / (2 * cellsize)
-        # +-------+-------+-------+       OR
-        # |       |       |       |          HORN:
-        # |   g   |   h   |   i   |          dx = ((c + 2*f + i) - (a + 2*d + g) ) / ( 8 * cellsize )
-        # |       |       |       |          dy = ((g + 2*h + i) - (a + 2*b + c) ) / ( 8 * cellsize )
-        # +-------+-------+-------+
-        #
-        # To make the math go faster, we create sub-arrays, shifted appropriately, to allow numpy to do the work
-        A = np.pad(elevArray, 1, 'edge')  # adds a 1-px border; covers edge cases.  Will be trimmed in the slicing manipulations.
-
-        a = A[0:-2, 0:-2]
-        b = A[0:-2, 1:-1]
-        c = A[0:-2, 2:]
-
-        d = A[1:-1, 0:-2]
-        f = A[1:-1, 2:]
-
-        g = A[2:, 0:-2]
-        h = A[2:, 1:-1]
-        i = A[2:, 2:]
-
-        Z = np.ones(elevArray.shape, dtype=A.dtype)
-
-        if argv['gradient'].valueAsText == "Ritter":
-            self.LOG.debug("Calculating Gradient using RITTER")
-            dx = (d - f) / ( 2 * demInfo.meanCellWidth)
-            dy = (h - b) / ( 2 * demInfo.meanCellHeight)
-        else:
-            self.LOG.debug("Calculating Gradient using HORN")
-            dx = ((a + 2*d + g) - (c + 2*f + i)) / ( 8 * demInfo.meanCellWidth)
-            dy = ((g + 2*h + i) - (a + 2*b + c)) / ( 8 * demInfo.meanCellHeight)
-
-        mag = np.sqrt(dx ** 2 + dy ** 2 + Z ** 2)
-        sn = np.stack([dx / mag, dy / mag, Z / mag], 2)
+        sn = surface.normals_by_method(elevArray, demInfo.meanCellWidth, "N82")  # N82 method closely approximates the method Esri uses
 
         self.LOG.debug("Shape of surfacenormal output: {}".format(sn.shape))
-        # This follows the convention where the third index is the band number in the wider world of image processing.
-        # To obtain a band as a 2D array, slice via:
-        #   >> ARRAY[:,:,0] for red band
-        #   >> ARRAY[:,:,1] for green band
-        #   >> ARRAY[:,:,2] for blue band
 
-        Nx = arcpy.NumPyArrayToRaster(sn[:,:,0], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
-        Ny = arcpy.NumPyArrayToRaster(sn[:,:,1], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
-        Nz = arcpy.NumPyArrayToRaster(sn[:,:,2], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
+        Nx = arcpy.NumPyArrayToRaster(sn[0,:,:], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
+        Ny = arcpy.NumPyArrayToRaster(sn[1,:,:], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
+        Nz = arcpy.NumPyArrayToRaster(sn[1,:,:], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
         elev = arcpy.NumPyArrayToRaster(elevArray, tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
 
         self.LOG.debug("Composite to Multi-Band {}".format(basename(argv['output'].valueAsText)))
@@ -444,8 +385,8 @@ class Traditional_Hillshade(ReliefTool):
         arcpy.SetProgressor("default", "Calculating Shade Values...")
         self.LOG.debug("Shading...")
 
-        L = lightVector(argv['lightAz'].value, argv['lightEl'].value)
-        hs = lambert(surfaceNormals, L)
+        L = utils.lightVector(argv['lightAz'].value, argv['lightEl'].value)
+        hs = shader.lambert(surfaceNormals, L)
         self.LOG.debug(f"Convert {hs.dtype} to uint8 ...")
         ## All negative values set to zero...
         hs[hs < 0] = 0
@@ -458,13 +399,14 @@ class Traditional_Hillshade(ReliefTool):
 
         if argv['shadows'].value == True:
             arcpy.SetProgressorLabel("Modeling Shadows...")
+            self.LOG.debug(f"Shadows ...")
             elevArray = arcpy.RasterToNumPyArray(inputDEM + r"\DEM")
-            shadowArray = castShadows_ShadowLine(elevArray,
+            shadowArray = shadow.shadowLine(elevArray,
                                                  argv['lightAz'].value,
                                                  argv['lightEl'].value,
                                                  demInfo.meanCellWidth
                                                  )
-            hs[shadowArray == 0] = 0
+            clamped[shadowArray > 0] = 0
         arcpy.SetProgressor("default", "Writing Output to {} ...".format(basename(argv['output'].valueAsText)))
         self.LOG.debug("Writing Outputs...")
         outRaster = arcpy.NumPyArrayToRaster(clamped, tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
@@ -511,21 +453,21 @@ class Soft_Hillshade(ReliefTool):
         arcpy.SetProgressor("default", "Calculating Shade Values...")
         self.LOG.debug("Shading...")
 
-        L = lightVector(argv['lightAz'].value, argv['lightEl'].value)
-        hs = lambert(surfaceNormals, L)  # lambert output is -1 to 1...
+        L = utils.lightVector(argv['lightAz'].value, argv['lightEl'].value)
+        hs = shader.lambert(surfaceNormals, L)  # lambert output is -1 to 1...
         hs =  (hs + 1 ) / 2  # rescale to fit 0 to 1
 
         if argv['shadows'].value == True:
             self.LOG.debug("Casting Shadows...")
             arcpy.SetProgressorLabel("Casting Shadows...")
             elevArray = arcpy.RasterToNumPyArray(inputDEM + r"\DEM")
-            shadowArray = castShadows_ShadowLine(elevArray,
+            shadowArray = shadow.shadowLine(elevArray,
                                                  argv['lightAz'].value,
                                                  argv['lightEl'].value,
                                                  demInfo.meanCellWidth
                                                  )
 
-            hs[shadowArray == 0] *= 0.5
+            hs[shadowArray > 0] *= 0.5
 
         arcpy.SetProgressor("default", "Writing Output to {} ...".format(basename(argv['output'].valueAsText)))
         self.LOG.debug("Writing Outputs...")
@@ -608,42 +550,42 @@ class Sky_Tool(ReliefTool):
         arcpy.SetProgressor("step", f"Processing {len(lightList)} Illumination Sources...", 0, len(lightList), 1)
         for (i, (azimuth, elev, wt)) in enumerate(lightList):
             self.LOG.debug(f"...Light {i}: az={azimuth}, el={elev}, wt={wt}")
-            L = lightVector(float(azimuth), float(elev))
+            L = utils.lightVector(float(azimuth), float(elev))
             arcpy.SetProgressorLabel(f"Light {i} of {len(lightList)}:  Azimuth={azimuth}, Elevation={elev}")
             arcpy.SetProgressorPosition(i)
 
-            shadow = True
+            castshadow = True
             shade = True
             if (shade_shadow == "Shade & Shadow"):
                 shade = True
-                shadow = True
+                castshadow = True
             if (shade_shadow == "Shadow Only"):
                 shade = False
-                shadow = True
+                castshadow = True
             if (shade_shadow == "Shade Only"):
                 shade = True
-                shadow = False
+                castshadow = False
 
-            if (shadow):
-                shadowArray = castShadows_ShadowLine(DEMarray, float(azimuth), float(elev),  demInfo.meanCellWidth )
+            if (castshadow):
+                shadowArray = shadow.shadowLine(DEMarray, float(azimuth), float(elev),  demInfo.meanCellWidth )
             else:
-                shadowArray = np.ones(DEMarray.shape)
+                shadowArray = np.zeros(DEMarray.shape)
 
             if (shade):
-                hs = lambert(N, L)
+                hs = shader.lambert(N, L)
             else:
                 hs = np.ones(DEMarray.shape)
 
 
             if (clampOutput):
                 hs[hs<=0] = 0
-                hs[shadowArray==0] = 0
+                hs[shadowArray > 0] = 0
                 hs *= 255.0
                 outputArray = outputArray + (hs * float(wt))
 
             else:
                 hs = (hs + 1) / 2
-                hs[shadowArray == 0] *= 0.5
+                hs[shadowArray > 0] *= 0.5
                 outputArray = outputArray + (hs * float(wt))
         self.LOG.debug(f"Processed {i+1} light vectors.")
         return outputArray
@@ -712,9 +654,21 @@ class Bump_Tool(ReliefTool):
             return (bumpMap - 0.5) * 2
         return bumpMap
 
-    def consolidateBumpMaps(self, bmMaster, nlcdArray, t):
+    def consolidateBumpMaps(self, extentShape, nlcdArray, t):
+        """
+        :param extentShape: The tuple representing the shape of the output array.  Should be (band,row,col), with three bands.
+        :param nlcdArray:
+        :param t:
+        :return:
+        """
         logger = logging.getLogger(splitext(basename(__file__))[0])
         logger.debug("Consolidating bump maps...")
+
+        bmMaster = np.zeros(extentShape)
+        bmMaster[2, :,:] = 1.0 # all vectors in the bump-map master are now [0,0,1]
+        logger.debug("bmMaster shape is {}".format(bmMaster.shape))
+        logger.debug("NLCD shape is {}".format(nlcdArray.shape))
+
         pathPrefix = dirname(__file__) + "\\BumpMaps\\"
         arcpy.SetProgressor("step", "Tiling Bump Map:", 0, len(t)+1, 1)
         for (count, row) in enumerate(t):
@@ -724,9 +678,12 @@ class Bump_Tool(ReliefTool):
             logger.debug("Processing bump map: {} of {}: {}".format(count, len(t), bumpmapFile))
             image = Image.open(bumpmapFile)
             Bm = np.asarray(image)
+            # IMPORTANT NOTE:  An RGB image is read in to an array of shape (row, column, band).
+            # In manipulating multi-band rasters in arcpy, the band is the first index.  Needs to be
+            # re-shaped to (band, row, col).  We'll do that after tiling the image...
 
             logger.debug(" ...Tiling {}x{} Image: {}".format(Bm.shape[0], Bm.shape[1], row[1]))
-            x, y, _ = bmMaster.shape
+            _, x, y = bmMaster.shape
             x_tiles = (x // Bm.shape[0]) + 2
             y_tiles = (y // Bm.shape[1]) + 2
             img = np.tile(Bm, (x_tiles, y_tiles, 1))
@@ -734,27 +691,31 @@ class Bump_Tool(ReliefTool):
             center_y = img.shape[1] // 2
             Bm = img[center_x - (x // 2):center_x + (x // 2) + 1, center_y - (y // 2):center_y + (y // 2) + 1, :]
             Bm = Bm[0:x, 0:y, 0:3] # discard alpha channel, if present
-
             B = self.reScale(Bm)
-            logger.debug("bmMaster shape is {}".format(bmMaster.shape))
-            logger.debug("nlcd shape is {}".format(nlcdArray.shape))
+            B = np.moveaxis(B, 2, 0) ##<<<<< change from (row,col,band) to (band,row,col), to match bmMaster.
             logger.debug("B shape is {}".format(B.shape))
-            logger.debug("Bm shape is {}".format(Bm.shape))
+            (x,y) = nlcdArray.shape
+            n = np.broadcast_to(nlcdArray, (3, x, y))
+            bmMaster[n == maskValue] = B[n == maskValue]
 
-            bmMaster[nlcdArray == maskValue] = B[nlcdArray == maskValue]
         logger.debug("Master Bump Map Assembled... ")
-        return bmMaster
+        return  bmMaster
 
     def applyBumpMap(self, S, B):
+        """
+        :param S: Surface normal vector array.  (band, row, column)
+        :param B: Bump map surface normal vectors (band, row, column)
+        :return: Bumpified surface normal vectors for surface
+        """
         logger = logging.getLogger(splitext(basename(__file__))[0])
         logger.debug("Bump Map >> S shape is {}, B shape is {}".format(S.shape, B.shape))
-        Uz = S[:, :, 0] / S[:, :, 2]
+        Uz = S[0,:, :] / S[2, :, :]
         mag = np.sqrt(1 + Uz ** 2)
-        U = np.stack([1 / mag, np.zeros((S.shape[0], S.shape[1])), -Uz / mag], 2)
+        U = np.stack([1 / mag, np.zeros((S.shape[1], S.shape[2])), -Uz / mag], 0)
 
-        Vz = S[:, :, 1] / S[:, :, 2]
+        Vz = S[1, :, :] / S[2, :, :]
         mag = np.sqrt(1 + Vz ** 2)
-        V = np.stack([np.zeros((S.shape[0], S.shape[1])), 1 / mag, -Vz / mag], 2)
+        V = np.stack([np.zeros((S.shape[1], S.shape[2])), 1 / mag, -Vz / mag], 0)
 
         # N is a straightforward change-of-basis calculation.  We are going from tangent space
         # to world space.  Tangent space is defined by U, V, and S vectors:
@@ -763,14 +724,14 @@ class Bump_Tool(ReliefTool):
         #    - S is the original surface normal, a.k.a. k-hat -- one unit in the "z" direction.
         # Dot each of these vectors with the bump-map vector (which is in tangent space)
         # to get the i,j,k components of that same vector in world space:
-        Nx = (U[:, :, 0] * B[:, :, 0]) + (V[:, :, 0] * B[:, :, 1]) + (S[:, :, 0] * B[:, :, 2])
-        Ny = (U[:, :, 1] * B[:, :, 0]) + (V[:, :, 1] * B[:, :, 1]) + (S[:, :, 1] * B[:, :, 2])
-        Nz = (U[:, :, 2] * B[:, :, 0]) + (V[:, :, 2] * B[:, :, 1]) + (S[:, :, 2] * B[:, :, 2])
+        Nx = (U[0, :, :] * B[0, :, :]) + (V[0,:, :] * B[1,:, :]) + (S[0, :, :] * B[2, :, :])
+        Ny = (U[1, :, :] * B[0, :, :]) + (V[1,:, :] * B[1,:, :]) + (S[1, :, :] * B[2, :, :])
+        Nz = (U[2, :, :] * B[0, :, :]) + (V[2,:, :] * B[1,:, :]) + (S[2, :, :] * B[2, :, :])
 
         mag = np.sqrt(Nx ** 2 + Ny ** 2 + Nz ** 2)  # In theory, N is already normalized.  This guarantees it.
         # N is the surface normal vector S, with bump map B applied to it.
         logger.debug("Bumped.")
-        return np.stack([Nx / mag, Ny / mag, Nz / mag], 2)
+        return np.stack([Nx / mag, Ny / mag, Nz / mag], 0)
 
 
 class NLCD_Bump_Mapper(Bump_Tool):
@@ -857,28 +818,26 @@ class NLCD_Bump_Mapper(Bump_Tool):
         surfaceNormals = self.readVectorArray(inputDEM)
 
         nlcd = arcpy.RasterToNumPyArray(argv['NLCD'].valueAsText)
-
         nlcdInfo = arcpy.Describe(argv['NLCD'].valueAsText)
 
         ## nlcd raster must have same geometry and projection as the surface dataset. . .
         if demInfo.spatialReference.name != nlcdInfo.spatialReference.name:
             self.LOG.error("Spatial Reference Does Not Match")
 
-        L = lightVector(argv['lightAz'].value, argv['lightEl'].value)
+        L = utils.lightVector(argv['lightAz'].value, argv['lightEl'].value)
 
-        xDim = min(surfaceNormals.shape[0], nlcd.shape[0])
-        yDim = min(surfaceNormals.shape[1], nlcd.shape[1])
+        xDim = min(surfaceNormals.shape[1], nlcd.shape[0])
+        yDim = min(surfaceNormals.shape[2], nlcd.shape[1])
         nlcd = nlcd[0:xDim, 0:yDim]
+        self.LOG.debug("NLCD read from {}, with shape {}".format(argv['NLCD'].valueAsText, nlcd.shape))
 
-        bmMaster = np.zeros(surfaceNormals.shape)
-        bmMaster[:,:,2] = 1.0
-        bmMaster = self.consolidateBumpMaps(bmMaster, nlcd, argv['lc_table'].values)
+        bmMaster = self.consolidateBumpMaps(surfaceNormals.shape, nlcd, argv['lc_table'].values)
 
         arcpy.SetProgressor("default", "Applying Assembled Bump Map ...")
         N = self.applyBumpMap(surfaceNormals, bmMaster)
 
         self.LOG.debug(" ...Shading Bumpmapped normal field")
-        bmHS = lambert(N, L)  # output is -1 to 1
+        bmHS = shader.lambert(N, L)  # output is -1 to 1
         bmHS = (bmHS + 1) / 2 # scale to fit 0-1 range
         bmHS = bmHS[0:xDim,0:yDim]
         self.LOG.debug("DONE")
@@ -927,42 +886,6 @@ class Prep_NLCD_Bumpmap_Mask(ReliefTool):
         return
 
 #  > > > > > > > > > > > > > > > Useful utility functions < < < < < < < < < < < < < < < <
-def lightVector(Az, El):
-    """
-    :param Az: Compass direction (from north, increasing clockwise).  In degrees [0-359]
-    :param El: Elevation above horizon. In degrees [0-90].  0=horizon, 90=overhead
-    :return: normalized vector (as numpy array) representing light direction
-    """
-    logger = logging.getLogger(splitext(basename(__file__))[0])
-
-    Az_rad = float(Az) * (PI / 180)
-    El_rad = float(El) * (PI / 180)
-
-    L = np.array([
-        sin(Az_rad) * cos(El_rad),  # X
-        cos(Az_rad) * cos(El_rad),  # Y
-        sin(El_rad)  # Z
-    ])
-    ## In theory, this vector is already unit length one.  But let's normalize anyway...
-    L /= np.sqrt((L**2).sum())
-    logger.debug("LightVector >> {} / {} == {} ({})".format(Az, El, L.tolist(), L.dtype))
-    return L
-
-def lambert(S, L):
-    """
-    :param S: 3-band array with the band  as the third index
-    :param L: 3D vector of light direction
-    :return: A single band, 2D array representing the shade values according to Lambert Cosine Emission Law
-    """
-    logger = logging.getLogger(splitext(basename(__file__))[0])
-    #logger.debug("Lambertian Hillshade >> shape in = {}".format(S.shape))
-
-    hillshadeArray = (S[:,:,0] * L[0]) + (S[:,:,1] * L[1]) + (S[:,:,2] * L[2])
-
-    logger.debug("Lambertian Hillshade >> Min={} / Max={} ({})".format(hillshadeArray.min(), hillshadeArray.max(), hillshadeArray.dtype))
-    #logger.debug("Lambertian Hillshade >> shape out = {}".format(hillshadeArray.shape))
-    return hillshadeArray
-
 
 def getUniqueValues(P):
     r = arcpy.Raster(P)
@@ -971,98 +894,3 @@ def getUniqueValues(P):
         return np.unique(a.ravel()).tolist()
     else:
         return []
-
-
-def castShadows_ShadowLine(d, az, el, cellwidth):
-    A = np.ones(d.shape)
-    S = lightVector(az, el)
-
-    # X,Y as geographic coordinates are not the same as X,Y in numpy arrays.
-    # switch to row/col names for numpy manipulations to save sanity.
-    lineMax = A.shape[0] - 1
-    colMax = A.shape[1] - 1
-
-    del_col = S[0]
-    del_row = -S[1]
-    del_H = S[2]
-
-    shadowLine = np.pad(d, 1, 'edge')
-
-    # The counters increment or decrement based on the dominant light direction.
-    # I am not fiddling with the math to get those iterables .... Using if statements to run an unrolled
-    # bit of code depending on dominant lighting direction.  This is ugly, but works.  TODO: generalize the
-    # formula to use iterables with the right sign.
-    if (az <= 45.0 or az > 315.0):
-        dH_drow = abs(del_H / del_row) * cellwidth
-        p = abs(del_col / del_row)
-
-        for line in range(1, lineMax):
-            dem = d[line - 1, :]
-            n = shadowLine[line - 1, 1:-1]
-            sl = shadowLine[line, 1:-1]
-            a = A[line - 1]
-            if del_col <= 0:
-                nw = shadowLine[line - 1, :-2]
-            else:
-                nw = shadowLine[line - 1, 2:]
-            tstHeights = (n * (1 - p)) + (nw * (p)) - dH_drow
-
-            sl[dem < tstHeights] = tstHeights[dem < tstHeights]
-            a[dem < tstHeights] = 0
-
-    if (225 < az <= 315):
-        dH_dcol = abs(del_H / del_col) * cellwidth
-        p = abs(del_row / del_col)
-
-        for col in range(1, colMax):
-            dem = d[:, col - 1]
-            w = shadowLine[1:-1, col - 1]
-            sl = shadowLine[1:-1, col]
-            a = A[:, col - 1]
-            if del_row <= 0:
-                nw = shadowLine[:-2, col - 1]
-            else:
-                nw = shadowLine[2:, col - 1]
-            tstHeights = (w * (1 - p)) + (nw * (p)) - dH_dcol
-
-            sl[dem < tstHeights] = tstHeights[dem < tstHeights]
-            a[dem < tstHeights] = 0
-
-    if (135 < az <= 225):
-        dH_drow = abs(del_H / del_row) * cellwidth
-        p = abs(del_col / del_row)
-
-        for line in range(lineMax, 0, -1):
-            dem = d[line, :]
-            s = shadowLine[line + 2, 1:-1]
-            sl = shadowLine[line + 1, 1:-1]
-            a = A[line]
-            if del_col <= 0:
-                sw = shadowLine[line + 2, :-2]
-            else:
-                sw = shadowLine[line + 2, 2:]
-
-            tstHeights = (s * (1 - p)) + (sw * (p)) - dH_drow
-
-            sl[dem < tstHeights] = tstHeights[dem < tstHeights]
-            a[dem < tstHeights] = 0
-
-    if (45 < az <= 135):
-        dH_dcol = abs(del_H / del_col) * cellwidth
-        p = abs(del_row / del_col)
-
-        for col in range(colMax, 0, -1):
-            dem = d[:, col]
-            e = shadowLine[1:-1, col + 2]
-            sl = shadowLine[1:-1, col + 1]
-            a = A[:, col - 1]
-            if del_row <= 0:
-                ne = shadowLine[:-2, col + 2]
-            else:
-                ne = shadowLine[2:, col + 2]
-            tstHeights = (e * (1 - p)) + (ne * (p)) - dH_dcol
-
-            sl[dem < tstHeights] = tstHeights[dem < tstHeights]
-            a[dem < tstHeights] = 0
-
-    return A
