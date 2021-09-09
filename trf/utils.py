@@ -4,6 +4,7 @@
 #
 #
 import numpy as np
+import csv
 from math import sin, cos, pi
 
 
@@ -24,4 +25,22 @@ def lightVector(Az, El):
     ## In theory, this vector is already unit length one.  But let's normalize anyway...
     L /= np.sqrt((L**2).sum())
     return L
+
+
+def lightList(f):
+    """
+    :param f: File name/path to the sky config file.
+    :return: list of light directions and their weights.
+    """
+    lts = []
+    with open(f, "r") as skyConfigFile:
+        csvReadFile = csv.reader(skyConfigFile)
+        for line in csvReadFile:
+            # brute force -- if this line does not have three comma-separated values, we skip.
+            if (len(line) < 3):
+                continue
+            if line[0].startswith("Format"): #special case... a 'comment' line in the header happens to have two commas in it.
+                continue
+            lts.append(line)
+    return lts
 
