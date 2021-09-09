@@ -4,9 +4,8 @@
 ### Python Toolbox for ArcGIS Pro: Surface Orientation Toolbox
 
 * __Study DEM__ -- Tool to process DEM inputs and generate the multi-band raster dataset representing the surface normal 
-  vectors used by all of the tools listed below.  Surface normal vectors are derived from gradient.  Two methods are 
-  offered as options for calculating gradient.  Horn is the default, which will generate vectors which agree with 
-  Esri's hillshade output best. The output from this tool should be placed in a geodatabase.  It will be a 4-band raster,
+  vectors used by all of the tools listed below.  Surface normal vectors are derived from gradient obtained via 
+  a Sobel operator.  The output from this tool should be placed in a geodatabase.  It will be a 4-band raster,
   with the bands being:
     * DEM -- A copy of the elevation data
     * Nx -- The X component of the surface normal vector
@@ -28,7 +27,7 @@
       where the surface normal vector is greater than 90 degrees from the light vector. Shadows are also modeled.  
       Rather than casting shadows to full-black, a pixel found to be in shadow is multiplied by 0.5.  This will darken
       the pixel substantially, but permits variation among shadowed areas, preserving detail.  Recommend stretching 
-      this output on a color ramp where:
+      this output on a minimum-maximum color ramp where:
         * Hillshade values from 0 to 0.5 ramp from 100% black to 80% black
         * Hillshade values from 0.5 to 1.0 ramp from 80% black to 0% black (100% white)
       
@@ -39,10 +38,10 @@
         set to one. 
 * _<u>Bumpmaps</u>_ ToolSet
     * __NLCD_Bump_Mapper__ -- Configures and applies bump-map tiles according to a land use raster mask. The 
-      use-case was built around land cover, which is why *NLCD* terminology is used. 
+      use-case was built around land cover, which is why *NLCD* terminology is used. The bump-mapper expects 
+      the NLCD masking raster to have same cell size, extent, dimensions, and projection as the terrain raster.
     * __Prep_NLCD_Bumpmap_Mask__ -- This tool helps to clip, resample, and re-project NLCD or similar raster data to
-      match the surface normal dataset. The bump-mapper expects the NLCD masking raster to have same cell size, extent,
-      dimensions, and projection. This tool simplifies that process.
+      match the surface normal dataset.
       
 
 Options for all Surface Normal Tools:
@@ -66,7 +65,7 @@ folder to have them included as an option for the tool.
 The `SketchNotebooks` folder includes a few Jupyter notebooks which capture some of the algorithms
 used in the toolbox.  Some of these use the Crater Lake DEM (as GeoTIFF) dataset.  You'll need to 
 download your own copy of that dataset from https://shadedrelief.com/SampleElevationModels/ and adjust
-the path to this TIFF in the notebook. 
+the path to the TIFF in the notebook. 
 
 ### Support Files
 * __`LambertColorRamps.stylx`__ -- ArcGIS Pro style file for the color ramps used for soft hillshades. 
