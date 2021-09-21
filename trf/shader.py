@@ -52,7 +52,6 @@ def oren_nayer(normal, dirToLight, sigma):
 
     return BV
 
-
 def lommel_seeliger(normal, dirToLight):
     dirToCamera = np.array([0, 0, 1.0])
     cos_e = lambert(normal, dirToCamera)
@@ -61,35 +60,9 @@ def lommel_seeliger(normal, dirToLight):
     BV[cos_i >= 0] = 1 / (1 + (cos_e[cos_i >= 0] / cos_i[cos_i >= 0]))
     return BV
 
-
-def rusinkiewicz(normal, dirToLight):
-    gkernel = np.array([
-        [1, 4, 6, 4, 1],
-        [4, 16, 24, 16, 4],
-        [6, 24, 36, 24, 6],
-        [4, 16, 24, 16, 4],
-        [1, 4, 6, 4, 1]
-    ])
-    k = gkernel / np.sum(gkernel.ravel())
-    blurred = np.zeros(normal.shape)
-    blurred[0] = ndimage.convolve(normal[0], k)
-    blurred[1] = ndimage.convolve(normal[1], k)
-    blurred[2] = ndimage.convolve(normal[2], k)
-    mag = np.sqrt(blurred[0] ** 2 + blurred[1] ** 2 + blurred[2] ** 2)
-    blurred = blurred / mag
-    l_global = np.zeros(normal.shape)
-    l_global[0] = dirToLight[0]
-    l_global[1] = dirToLight[1]
-    l_global[2] = dirToLight[2]
-    lv = l_global - (blurred * lambert(blurred, dirToLight))
-    BV = lv[0] * normal[0] + lv[1] * normal[1] * lv[2] * normal[2]
-    return (BV + 1) / 2
-
-
 def mixedLambert(normal, dirToLight):
     w1 = 15
     w2 = 85
-
     gkernel = np.array([
         [1, 4, 6, 4, 1],
         [4, 16, 24, 16, 4],
