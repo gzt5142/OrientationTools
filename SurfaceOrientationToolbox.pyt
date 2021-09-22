@@ -658,7 +658,7 @@ class Bump_Tool(ReliefTool):
         """
         :param extentShape: The tuple representing the shape of the output array.  Should be (band,row,col), with three bands.
         :param nlcdArray:
-        :param t:
+        :param t: list of tiles.  each entry in the list is a 2-element list: [int, filename]
         :return:
         """
         logger = logging.getLogger(splitext(basename(__file__))[0])

@@ -44,3 +44,15 @@ def lightList(f):
             lts.append(line)
     return lts
 
+
+def normalize(bumpMap):
+    # "...Casting {} to range -1 to 1".format(bumpMap.dtype)
+    if bumpMap.dtype == 'uint8':
+        return ((bumpMap / (2 ** 8 - 1)) * 2) - 1
+    if bumpMap.dtype == 'uint16':
+        return ((bumpMap / (2 ** 16 - 1)) * 2) - 1
+    if bumpMap.dtype == 'float32':
+        return (bumpMap - 0.5) * 2
+    if bumpMap.dtype == 'float64':
+        return (bumpMap - 0.5) * 2
+    return bumpMap
