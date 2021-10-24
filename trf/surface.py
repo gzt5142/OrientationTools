@@ -4,28 +4,45 @@ from math import sqrt
 
 from . import utils
 
-def gradient(A, cellwidth, method="N4"):
+def gradient(A, cellwidth, **kwargs):
     """
     :param A: The array of heights. For terrains, this is the DEM.
     :param cellwidth: cell height and width.  This should be in same units as the heights encoded in A
-    :param m: Which method to estimate gradient? A list of valid method identifiers is below.
+    :param (optional) method= : Which method to estimate gradient? A list of valid method identifiers is below.
+    :param (optiona) level= : how much to generalize by increasing the sample distance. level is an integer which
+        indicates the number of cells in each direction to go for samples.  level=1 is standard (kings case).
+        level=2 samples cells in the orthogonal and diagonal directions, but 2 cells away.
     :return: A two-element array holding rasters for nabla X and nabla Y for the given height field.
     """
     #
-    A = np.pad(A, 1, 'edge')  # adds a 1-px border; covers edge cases.  Will be trimmed in the slicing manipulations.
 
+    if 'level' in kwargs:
+        k = kwargs['level']
+    else:
+        k = 1
+    # Level 1 is a 3x3 kernel
+    # Level 2 is a 5x5 kernel
+    # Level 3 is a 7x7 kernel
+    # Level X is a square kernel of 2**X + 1 pixels.
+
+    if 'method' in kwargs:
+        method = kwargs['method']
+    else:
+        method = "N82"
+
+    A = np.pad(A, k, 'edge')  # adds a border; covers edge cases.  Will be trimmed in the slicing manipulations.
     # Create slices of the height array, shifted in each direction.
-    a = A[0:-2, 0:-2]
-    b = A[0:-2, 1:-1]
-    c = A[0:-2, 2:]
+    a = A[0:-(2*k), 0:-(2*k)]
+    b = A[0:-(2*k), k:-k]
+    c = A[0:-(2*k), (2*k):]
 
-    d = A[1:-1, 0:-2]
-    e = A[1:-1, 1:-1]
-    f = A[1:-1, 2:]
+    d = A[k:-k, 0:-(2*k)]
+    e = A[k:-k, k:-k]
+    f = A[k:-k, (2*k):]
 
-    g = A[2:, 0:-2]
-    h = A[2:, 1:-1]
-    i = A[2:, 2:]
+    g = A[(2*k):, 0:-(2*k)]
+    h = A[(2*k):, k:-k]
+    i = A[(2*k):, (2*k):]
 
     #
     # +-------+-------+-------+
@@ -53,7 +70,7 @@ def gradient(A, cellwidth, method="N4"):
     m = method.upper()
     # just in case we get handed a bogus method code:
     if m not in ['FFD', 'SimpleD', 'N4', '2FD', 'N82', '3FDWRSD', 'N8R', '3FDWRD', 'N8E', '3FD']:
-        m = 'N4'
+        m = 'N82'
 
     # Various methods to compute the partial derivatives for change in z with respect to x and y
     # are available.  dz/dx is dz_dx and dz/dy is dz_dy
@@ -106,11 +123,15 @@ def gradient(A, cellwidth, method="N4"):
 
 
 def normals_by_method(DEM, cellwidth, m):
-    # Z = np.ones(DEM.shape, dtype=np.double)
+    """
+    :param DEM: 2D array of height values
+    :param cellwidth: size of one pixel in same units of height field.
+    :param m: Method
+    :return: a 3D array of [band, row, col] where the bands are the x, y, and z components.
+    """
     [dx, dy] = gradient(DEM, cellwidth, method=m)
-
     # save a few cycles by using the constant '1' instead of Z**2, since Z is always ones before normalizing
-    mag = np.sqrt(dx ** 2 + dy ** 2 + 1)
+    mag = np.sqrt(dx**2 + dy**2 + 1)
     return np.stack([-dx / mag, -dy / mag, 1 / mag], 0)
 
 
