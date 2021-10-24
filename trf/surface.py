@@ -84,42 +84,42 @@ def gradient(A, cellwidth, **kwargs):
     # This is an easy, intuitive case, and is our default if no method specified (or if the method given is
     # not in our list of implemented methods).
     if (m == "N4" or m == "2FD"):
-        dz_dx = (f - d) / (2 * cellwidth)
-        dz_dy = (b - h) / (2 * cellwidth)
+        dz_dx = (f - d) / (2 * cellwidth * k)
+        dz_dy = (b - h) / (2 * cellwidth * k)
 
     # N82 - 8 neighbors, weighted. Third order finite difference weighted by reciprocal of squared distance
     #      differential weights (Horn, 1981); Sobel operator (Richards, 1986).
     # TAPES-G name is 3FDWRSD
     # This is the method Esri uses for computing gradients (and from gradients, slope and aspect).
     if (m == "N82" or m == "3FDWRSD"):
-        dz_dx = ((c + 2 * f + i) - (a + 2 * d + g)) / (8 * cellwidth)
-        dz_dy = ((a + 2 * b + c) - (g + 2 * h + i)) / (8 * cellwidth)
+        dz_dx = ((c + 2 * f + i) - (a + 2 * d + g)) / (8 * cellwidth * k)
+        dz_dy = ((a + 2 * b + c) - (g + 2 * h + i)) / (8 * cellwidth * k)
 
     # SimpleD - Simple Difference
     if (m == "SimpleD"):
-        dz_dx = (e - h) / cellwidth
-        dz_dy = (e - d) / cellwidth
+        dz_dx = (e - h) / (cellwidth * k)
+        dz_dy = (e - d) / (cellwidth * k)
 
     #
     # FFD - Finite Frame Difference
     if (m == "FFD"):
-        dz_dx = (a - g + c - i) / (4 * cellwidth)
-        dz_dy = (i - g + c - a) / (4 * cellwidth)
+        dz_dx = (a - g + c - i) / (4 * cellwidth * k)
+        dz_dy = (i - g + c - a) / (4 * cellwidth * k)
 
     # N8R - 8 neighbors, weighted. Third order finite difference weighted by reciprocal  distance.
     #      Unwin, 1981 -  3FDWRD
     #
     if (m == "N8R" or m == "3FDWRD"):
         r = sqrt(2)
-        dz_dx = ((c + r * f + i) - (a + r * d + g)) / ((4 + 2 * r) * cellwidth)
-        dz_dy = ((a + r * b + c) - (g + r * h + i)) / ((4 + 2 * r) * cellwidth)
+        dz_dx = ((c + r * f + i) - (a + r * d + g)) / ((4 + 2 * r) * cellwidth * k)
+        dz_dy = ((a + r * b + c) - (g + r * h + i)) / ((4 + 2 * r) * cellwidth * k)
 
     # N8E - 8 neighbors, even weighting. "Queen's case": Equivalent to fitting a second order trend surface.
     #      Identical weights. TAPES-G calls this "3FD" -- "Third order finite difference"
     # 	    Horn, 1981; Heerdegen and Beran, 1982;  Wood, 1996
     if (m == "N8E" or m == "3FD"):
-        dz_dx = ((c + f + i) - (a + d + g)) / (6 * cellwidth)
-        dz_dy = ((a + b + c) - (g + h + i)) / (6 * cellwidth)
+        dz_dx = ((c + f + i) - (a + d + g)) / (6 * cellwidth * k)
+        dz_dy = ((a + b + c) - (g + h + i)) / (6 * cellwidth * k)
 
     return [dz_dx, dz_dy]
 
