@@ -28,7 +28,6 @@ class ArcPyPassThru(logging.Handler):
     Python Logging module handler to pass messages to the arcpy message queues. With this handler attached to
     a logger, you needn't call arcpy.AddMessage() separately -- nor should you if this is in use.
     """
-
     def __init__(self):
         super().__init__()
 
@@ -80,9 +79,7 @@ arcpyHandler = ArcPyPassThru()
 arcpyHandler.setFormatter(
     logging.Formatter("%(asctime)s.%(msecs)03d >> %(message)s", datefmt='%H:%M:%S')
 )
-
 initializeLoggers(arcpyHandler, logfileHandler)
-
 
 
 #  > > > > > > > > > > > > > > > Real Work Begins Here < < < < < < < < < < < < < < < <
@@ -108,7 +105,7 @@ class ReliefTool(object):
     """
     This class does not implement anything. It only exists to sub-class .... this boilerplate tool class
     handles a lot of the code which would otherwise be replicated in every other tool below.  Note that
-    this tool is not listed in the Toolbox.tools[] list, so it will not be seen by the user.
+    this tool is not listed in the Toolbox.tools[] list, so it will not be seen by the ArcGIS user.
     """
     def __init__(self, **kwargs):
         fname = splitext(basename(__file__))[0]
@@ -133,7 +130,6 @@ class ReliefTool(object):
         self.description = self.__doc__
         #    ^^^^ We set this here to ensure that it has a value. It should be
         #         overridden in the subclass to be that class's doc string.
-
 
     def getParameterInfo(self):
         # These four parameters are fairly standard for any relief shading tool in this toolbox.
@@ -241,6 +237,7 @@ class ReliefTool(object):
             arcpy.AddMessage("DEBUG logfile available in {}".format(basename(logfileHandler.baseFilename)))
         return
 
+
 class Hello_World(ReliefTool):
     """
     Example tool to show how to subclass ReliefTool().
@@ -255,12 +252,14 @@ class Hello_World(ReliefTool):
         argv = {p.name: p for p in parameters}
         self.LOG.debug("Beginning Execution... ")   # should go to logfile only.
         self.LOG.info("Hello, World!")  # should go to logfile as well as the arcgis pro message window.
-        self.LOG.debug("Done.") # logfile only.
+        self.LOG.debug("Done.")  # logfile only.
         return
+
 
 class Study_DEM(ReliefTool):
     """
-    Processes a DEM to create a multi-band raster dataset representing the X,Y,Z components of the surface normal vectors.
+    Processes a DEM to create a multi-band raster dataset representing the X,Y,Z
+    components of the surface normal vectors.
     """
     def __init__(self):
         super().__init__(toolname=__class__.__name__)
@@ -286,7 +285,6 @@ class Study_DEM(ReliefTool):
         )
         return [inputDEM, outputDataSet]
 
-
     def updateMessages(self, parameters):
         inputRaster = parameters[0].value
         parameters[0].clearMessage()
@@ -301,7 +299,6 @@ class Study_DEM(ReliefTool):
             parameters[0].clearMessage()
         return
 
-
     def execute(self, parameters, messages):
         super().execute(parameters, messages)
         argv = {p.name: p for p in parameters}
@@ -313,19 +310,20 @@ class Study_DEM(ReliefTool):
         tmpCorner = arcpy.Point(demInfo.extent.XMin, demInfo.extent.YMin)
         arcpy.env.outputCoordinateSystem = demInfo.spatialReference
 
-        elevArray = arcpy.RasterToNumPyArray(arcpy.Raster( argv['inDEM'].valueAsText), nodata_to_value=0)
+        elevArray = arcpy.RasterToNumPyArray(arcpy.Raster(argv['inDEM'].valueAsText), nodata_to_value=0)
 
         self.LOG.debug("Calculating Surface Normals from Gradient.")
         arcpy.SetProgressorLabel("Calculating Gradient...")
         self.LOG.debug("Shape of elevation data: {}".format(elevArray.shape))
 
-        sn = surface.normals(elevArray, demInfo.meanCellWidth, method="N82")  # N82 method closely approximates the method Esri uses
+        sn = surface.normals(elevArray, demInfo.meanCellWidth, method="N82")
+        # N82 method closely approximates the method Esri uses
 
         self.LOG.debug("Shape of surfacenormal output: {}".format(sn.shape))
 
-        Nx = arcpy.NumPyArrayToRaster(sn[0,:,:], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
-        Ny = arcpy.NumPyArrayToRaster(sn[1,:,:], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
-        Nz = arcpy.NumPyArrayToRaster(sn[1,:,:], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
+        Nx = arcpy.NumPyArrayToRaster(sn[0, :, :], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
+        Ny = arcpy.NumPyArrayToRaster(sn[1, :, :], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
+        Nz = arcpy.NumPyArrayToRaster(sn[1, :, :], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
         elev = arcpy.NumPyArrayToRaster(elevArray, tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
 
         self.LOG.debug("Composite to Multi-Band {}".format(basename(argv['output'].valueAsText)))
@@ -346,6 +344,7 @@ class Study_DEM(ReliefTool):
         self.LOG.debug("Finished.")
         return
 
+
 class Traditional_Hillshade(ReliefTool):
     """
     Clamps output of the Lambertian shader to [0..255], just as the traditional hillshade from Esri, Grass, GDAL, etc.
@@ -359,7 +358,7 @@ class Traditional_Hillshade(ReliefTool):
     def getParameterInfo(self):
         [inputDEM, lightAzimuth, lightElev, outputRaster] = super().getParameterInfo()
         modelShadows = arcpy.Parameter(
-            displayName = "Model Shadows?",
+            displayName="Model Shadows?",
             name='shadows',
             datatype="GPBoolean",
             parameterType="Optional",
@@ -370,9 +369,9 @@ class Traditional_Hillshade(ReliefTool):
 
     def execute(self, parameters, messages):
         super().execute(parameters, messages)
-        argv = {p.name: p for p in parameters} # convenience dict
+        argv = {p.name: p for p in parameters}   # convenience dict
 
-        ## Preamble...
+        # Preamble...
         inputDEM = argv['input'].valueAsText
         arcpy.SetProgressorLabel("Setting Up...")
         self.LOG.debug("Read Inputs...")
@@ -388,7 +387,7 @@ class Traditional_Hillshade(ReliefTool):
         L = utils.lightVector(argv['lightAz'].value, argv['lightEl'].value)
         hs = shader.lambert(surfaceNormals, L)
         self.LOG.debug(f"Convert {hs.dtype} to uint8 ...")
-        ## All negative values set to zero...
+        # All negative values set to zero...
         hs[hs < 0] = 0
         # Scale to range [0-255]  -- but we are still a floating point data type!
         hs *= 255.0
@@ -397,21 +396,18 @@ class Traditional_Hillshade(ReliefTool):
         clamped = hs.astype('uint8')
         self.LOG.debug(f"Output Clamped to [0..255] Min={clamped.min()} / Max={clamped.max()}")
 
-        if argv['shadows'].value == True:
+        if argv['shadows'].value:
             arcpy.SetProgressorLabel("Modeling Shadows...")
             self.LOG.debug(f"Shadows ...")
             elevArray = arcpy.RasterToNumPyArray(inputDEM + r"\DEM")
-            shadowArray = shadow.shadowLine(elevArray,
-                                                 argv['lightAz'].value,
-                                                 argv['lightEl'].value,
-                                                 demInfo.meanCellWidth
-                                                 )
+            shadowArray = shadow.shadowLine(elevArray, argv['lightAz'].value, argv['lightEl'].value, demInfo.meanCellWidth)
             clamped[shadowArray > 0] = 0
         arcpy.SetProgressor("default", "Writing Output to {} ...".format(basename(argv['output'].valueAsText)))
         self.LOG.debug("Writing Outputs...")
         outRaster = arcpy.NumPyArrayToRaster(clamped, tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
         outRaster.save(argv['output'].valueAsText)
         return
+
 
 class Soft_Hillshade(ReliefTool):
     """
@@ -427,7 +423,7 @@ class Soft_Hillshade(ReliefTool):
     def getParameterInfo(self):
         [inputDEM, lightAzimuth, lightElev, outputRaster] = super().getParameterInfo()
         modelShadows = arcpy.Parameter(
-            displayName = "Model Shadows?",
+            displayName="Model Shadows?",
             name='shadows',
             datatype="GPBoolean",
             parameterType="Optional",
@@ -438,7 +434,7 @@ class Soft_Hillshade(ReliefTool):
 
     def execute(self, parameters, messages):
         super().execute(parameters, messages)
-        argv = {p.name: p for p in parameters} # convenience dict
+        argv = {p.name: p for p in parameters}  # convenience dict
 
         # Preamble...
         inputDEM = argv['input'].valueAsText
@@ -455,9 +451,9 @@ class Soft_Hillshade(ReliefTool):
 
         L = utils.lightVector(argv['lightAz'].value, argv['lightEl'].value)
         hs = shader.lambert(surfaceNormals, L)  # lambert output is -1 to 1...
-        hs =  (hs + 1 ) / 2  # rescale to fit 0 to 1
+        hs = (hs + 1) / 2  # rescale to fit 0 to 1
 
-        if argv['shadows'].value == True:
+        if argv['shadows'].value:
             self.LOG.debug("Casting Shadows...")
             arcpy.SetProgressorLabel("Casting Shadows...")
             elevArray = arcpy.RasterToNumPyArray(inputDEM + r"\DEM")
@@ -474,6 +470,7 @@ class Soft_Hillshade(ReliefTool):
         outRaster = arcpy.NumPyArrayToRaster(hs, tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
         outRaster.save(argv['output'].valueAsText)
         return
+
 
 class Sky_Tool(ReliefTool):
     """
@@ -567,7 +564,7 @@ class Sky_Tool(ReliefTool):
                 castshadow = False
 
             if (castshadow):
-                shadowArray = shadow.shadowLine(DEMarray, float(azimuth), float(elev),  demInfo.meanCellWidth )
+                shadowArray = shadow.shadowLine(DEMarray, float(azimuth), float(elev),  demInfo.meanCellWidth)
             else:
                 shadowArray = np.zeros(DEMarray.shape)
 
@@ -576,9 +573,8 @@ class Sky_Tool(ReliefTool):
             else:
                 hs = np.ones(DEMarray.shape)
 
-
             if (clampOutput):
-                hs[hs<=0] = 0
+                hs[hs <= 0] = 0
                 hs[shadowArray > 0] = 0
                 hs *= 255.0
                 outputArray = outputArray + (hs * float(wt))
@@ -590,6 +586,7 @@ class Sky_Tool(ReliefTool):
         self.LOG.debug(f"Processed {i+1} light vectors.")
         return outputArray
 
+
 class Traditional_Sky_Model(Sky_Tool):
     """
     Kennelly, P. J., & Stewart, A. J. (2014). General sky models for illuminating terrains. International Journal
@@ -599,7 +596,6 @@ class Traditional_Sky_Model(Sky_Tool):
         super().__init__(toolname=__class__.__name__)
         self.description = self.__doc__
         self.category = "Shaded Relief"
-
 
     def execute(self, parameters, messages):
         argv = {p.name: p for p in parameters}
@@ -633,6 +629,7 @@ class Traditional_Sky_Model(Sky_Tool):
         outRaster.save(argv['output'].valueAsText)
         return
 
+
 class Bump_Tool(ReliefTool):
     def __init__(self, **kwargs):
         if 'toolname' in kwargs:
@@ -656,7 +653,8 @@ class Bump_Tool(ReliefTool):
 
     def consolidateBumpMaps(self, extentShape, nlcdArray, t):
         """
-        :param extentShape: The tuple representing the shape of the output array.  Should be (band,row,col), with three bands.
+        :param extentShape: The tuple representing the shape of the output array.
+            Should be (band,row,col), with three bands.
         :param nlcdArray:
         :param t: list of tiles.  each entry in the list is a 2-element list: [int, filename]
         :return:
@@ -665,7 +663,7 @@ class Bump_Tool(ReliefTool):
         logger.debug("Consolidating bump maps...")
 
         bmMaster = np.zeros(extentShape)
-        bmMaster[2, :,:] = 1.0 # all vectors in the bump-map master are now [0,0,1]
+        bmMaster[2, :, :] = 1.0  # all vectors in the bump-map master are now [0,0,1]
         logger.debug("bmMaster shape is {}".format(bmMaster.shape))
         logger.debug("NLCD shape is {}".format(nlcdArray.shape))
 
@@ -690,11 +688,11 @@ class Bump_Tool(ReliefTool):
             center_x = img.shape[0] // 2
             center_y = img.shape[1] // 2
             Bm = img[center_x - (x // 2):center_x + (x // 2) + 1, center_y - (y // 2):center_y + (y // 2) + 1, :]
-            Bm = Bm[0:x, 0:y, 0:3] # discard alpha channel, if present
+            Bm = Bm[0:x, 0:y, 0:3]  # discard alpha channel, if present
             B = self.reScale(Bm)
-            B = np.moveaxis(B, 2, 0) ##<<<<< change from (row,col,band) to (band,row,col), to match bmMaster.
+            B = np.moveaxis(B, 2, 0)  # <<<<< change from (row,col,band) to (band,row,col), to match bmMaster.
             logger.debug("B shape is {}".format(B.shape))
-            (x,y) = nlcdArray.shape
+            (x, y) = nlcdArray.shape
             n = np.broadcast_to(nlcdArray, (3, x, y))
             bmMaster[n == maskValue] = B[n == maskValue]
 
@@ -709,7 +707,7 @@ class Bump_Tool(ReliefTool):
         """
         logger = logging.getLogger(splitext(basename(__file__))[0])
         logger.debug("Bump Map >> S shape is {}, B shape is {}".format(S.shape, B.shape))
-        Uz = S[0,:, :] / S[2, :, :]
+        Uz = S[0, :, :] / S[2, :, :]
         mag = np.sqrt(1 + Uz ** 2)
         U = np.stack([1 / mag, np.zeros((S.shape[1], S.shape[2])), -Uz / mag], 0)
 
@@ -724,9 +722,9 @@ class Bump_Tool(ReliefTool):
         #    - S is the original surface normal, a.k.a. k-hat -- one unit in the "z" direction.
         # Dot each of these vectors with the bump-map vector (which is in tangent space)
         # to get the i,j,k components of that same vector in world space:
-        Nx = (U[0, :, :] * B[0, :, :]) + (V[0,:, :] * B[1,:, :]) + (S[0, :, :] * B[2, :, :])
-        Ny = (U[1, :, :] * B[0, :, :]) + (V[1,:, :] * B[1,:, :]) + (S[1, :, :] * B[2, :, :])
-        Nz = (U[2, :, :] * B[0, :, :]) + (V[2,:, :] * B[1,:, :]) + (S[2, :, :] * B[2, :, :])
+        Nx = (U[0, :, :] * B[0, :, :]) + (V[0, :, :] * B[1, :, :]) + (S[0, :, :] * B[2, :, :])
+        Ny = (U[1, :, :] * B[0, :, :]) + (V[1, :, :] * B[1, :, :]) + (S[1, :, :] * B[2, :, :])
+        Nz = (U[2, :, :] * B[0, :, :]) + (V[2, :, :] * B[1, :, :]) + (S[2, :, :] * B[2, :, :])
 
         mag = np.sqrt(Nx ** 2 + Ny ** 2 + Nz ** 2)  # In theory, N is already normalized.  This guarantees it.
         # N is the surface normal vector S, with bump map B applied to it.
@@ -797,7 +795,7 @@ class NLCD_Bump_Mapper(Bump_Tool):
                 try:
                     dname = dirname(__file__) + "\\BumpMaps\\"
                     self.LOG.debug("Looking for bump maps in {}... ".format(dname))
-                    params[5].filters[1].list = sorted([f for f in listdir(dname) if f.endswith('.tiff')] )
+                    params[5].filters[1].list = sorted([f for f in listdir(dname) if f.endswith('.tiff')])
                     self.LOG.debug("...found {}".format(len(params[5].filters[1].list)))
                 except:
                     raise
@@ -820,7 +818,7 @@ class NLCD_Bump_Mapper(Bump_Tool):
         nlcd = arcpy.RasterToNumPyArray(argv['NLCD'].valueAsText)
         nlcdInfo = arcpy.Describe(argv['NLCD'].valueAsText)
 
-        ## nlcd raster must have same geometry and projection as the surface dataset. . .
+        # nlcd raster must have same geometry and projection as the surface dataset. . .
         if demInfo.spatialReference.name != nlcdInfo.spatialReference.name:
             self.LOG.error("Spatial Reference Does Not Match")
 
@@ -838,14 +836,15 @@ class NLCD_Bump_Mapper(Bump_Tool):
 
         self.LOG.debug(" ...Shading Bumpmapped normal field")
         bmHS = shader.lambert(N, L)  # output is -1 to 1
-        bmHS = (bmHS + 1) / 2 # scale to fit 0-1 range
-        bmHS = bmHS[0:xDim,0:yDim]
+        bmHS = (bmHS + 1) / 2  # scale to fit 0-1 range
+        bmHS = bmHS[0:xDim, 0:yDim]
         self.LOG.debug("DONE")
 
         arcpy.SetProgressor("default", "Writing Output to {} ...".format(basename(argv['output'].valueAsText)))
         hs = arcpy.NumPyArrayToRaster(bmHS, tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
         hs.save(argv['output'].valueAsText)
         return
+
 
 class Prep_NLCD_Bumpmap_Mask(ReliefTool):
     def __init__(self):
@@ -871,10 +870,10 @@ class Prep_NLCD_Bumpmap_Mask(ReliefTool):
         arcpy.SetProgressorLabel("Setting Up...")
         self.LOG.debug("Read Inputs...")
 
-        demInfo = arcpy.Describe(inputDEM + r"\DEM")
+        demInfo = arcpy.Describe(inputDEM + r"\\DEM")
         arcpy.env.outputCoordinateSystem = demInfo.spatialReference
         arcpy.env.extent = demInfo.extent
-        arcpy.env.snapRaster = inputDEM + "r\DEM"
+        arcpy.env.snapRaster = inputDEM + "r\\DEM"
         envelope = str(demInfo.extent.XMin) + " " + str(demInfo.extent.YMin) + " " + str(demInfo.extent.XMax) + " " + str(demInfo.extent.YMax)
 
         self.LOG.debug("Resampling...")
@@ -886,6 +885,7 @@ class Prep_NLCD_Bumpmap_Mask(ReliefTool):
         return
 
 #  > > > > > > > > > > > > > > > Useful utility functions < < < < < < < < < < < < < < < <
+
 
 def getUniqueValues(P):
     r = arcpy.Raster(P)
