@@ -12,7 +12,7 @@
     * Ny -- The Y component of the surface normal vector
     * Nz -- The Z component of the surface normal vector
 
-  The output from this tool will be input for the following tools: 
+  The output from `Study DEM` will be input for the following tools: 
   
 * _<u>Shaded Relief</u>_ ToolSet
     * __Traditional Hillshade__ -- Produces a hillshade layer similar to that produced by other major players (Esri,
