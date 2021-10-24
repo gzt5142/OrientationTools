@@ -319,7 +319,7 @@ class Study_DEM(ReliefTool):
         arcpy.SetProgressorLabel("Calculating Gradient...")
         self.LOG.debug("Shape of elevation data: {}".format(elevArray.shape))
 
-        sn = surface.normals_by_method(elevArray, demInfo.meanCellWidth, "N82")  # N82 method closely approximates the method Esri uses
+        sn = surface.normals(elevArray, demInfo.meanCellWidth, method="N82")  # N82 method closely approximates the method Esri uses
 
         self.LOG.debug("Shape of surfacenormal output: {}".format(sn.shape))
 

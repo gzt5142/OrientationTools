@@ -4,12 +4,14 @@ from math import sqrt
 
 from . import utils
 
+
 def gradient(A, cellwidth, **kwargs):
     """
     :param A: The array of heights. For terrains, this is the DEM.
     :param cellwidth: cell height and width.  This should be in same units as the heights encoded in A
-    :param (optional) method= : Which method to estimate gradient? A list of valid method identifiers is below.
-    :param (optiona) level= : how much to generalize by increasing the sample distance. level is an integer which
+    :param kwargs:
+        (optional) method= : Which method to estimate gradient? A list of valid method identifiers is below.
+        (optiona) level= : how much to generalize by increasing the sample distance. level is an integer which
         indicates the number of cells in each direction to go for samples.  level=1 is standard (kings case).
         level=2 samples cells in the orthogonal and diagonal directions, but 2 cells away.
     :return: A two-element array holding rasters for nabla X and nabla Y for the given height field.
@@ -122,18 +124,18 @@ def gradient(A, cellwidth, **kwargs):
     return [dz_dx, dz_dy]
 
 
-def normals_by_method(DEM, cellwidth, m):
-    """
-    :param DEM: 2D array of height values
-    :param cellwidth: size of one pixel in same units of height field.
-    :param m: Method
-    :return: a 3D array of [band, row, col] where the bands are the x, y, and z components.
-    """
-    return normals(DEM, cellwidth, method=m)
-
-
-def smoothed_normals(DEM, cellwidth, m, l):
-    return normals(DEM, cellwidth, method=m, level=l)
+# def normals_by_method(DEM, cellwidth, m):
+#     """
+#     :param DEM: 2D array of height values
+#     :param cellwidth: size of one pixel in same units of height field.
+#     :param m: Method
+#     :return: a 3D array of [band, row, col] where the bands are the x, y, and z components.
+#     """
+#     return normals(DEM, cellwidth, method=m)
+#
+#
+# def smoothed_normals(DEM, cellwidth, m, l):
+#     return normals(DEM, cellwidth, method=m, level=l)
 
 
 def normals(DEM, cellwidth, **kwargs):
@@ -147,6 +149,7 @@ def normals(DEM, cellwidth, **kwargs):
     mag = np.sqrt(dx**2 + dy**2 + 1)
     return np.stack([-dx / mag, -dy / mag, 1 / mag], 0)
 
+
 def bump_extent_by_mask(maskArray, bumpMapTile):
     """
     :param maskArray:  boolean array of the cells where the bumpmap is to be applied.
@@ -155,9 +158,7 @@ def bump_extent_by_mask(maskArray, bumpMapTile):
     """
     (x, y) = maskArray.shape
     returnBumpMap = np.zeros((3, x, y))
-    returnBumpMap[2,:,:] = 1.0 # all vectors in the returned bump-map are now [0,0,1]
-
-
+    returnBumpMap[2, :, :] = 1.0  # all vectors in the returned bump-map are now [0,0,1]
     # IMPORTANT NOTE:  An RGB image is read in to an array of shape (row, column, band).
     # In manipulating multi-band rasters in arcpy, the band is the first index.  Needs to be
     # re-shaped to (band, row, col).  We'll do that after tiling the image...
@@ -168,12 +169,12 @@ def bump_extent_by_mask(maskArray, bumpMapTile):
     center_x = img.shape[0] // 2
     center_y = img.shape[1] // 2
     Bm = img[center_x - (x // 2):center_x + (x // 2) + 1, center_y - (y // 2):center_y + (y // 2) + 1, :]
-    Bm = Bm[0:x, 0:y, 0:3] # discard alpha channel, if present
+    Bm = Bm[0:x, 0:y, 0:3]  # discard alpha channel, if present
     B = utils.normalize(Bm)
-    B = np.moveaxis(B, 2, 0) ##<<<<< change from (row,col,band) to (band,row,col)
+    B = np.moveaxis(B, 2, 0)  # <<<<< change from (row,col,band) to (band,row,col)
     n = np.broadcast_to(maskArray, (3, x, y))
     returnBumpMap[n] = B[n]
-    return  returnBumpMap
+    return returnBumpMap
 
 
 def applyBumpMap(S, B):
@@ -182,8 +183,8 @@ def applyBumpMap(S, B):
     :param B: Bump map surface normal vectors (band, row, column)
     :return: Bumpified surface normal vectors for surface
     """
-    Uz = S[0,:, :] / S[2, :, :]
-    mag = np.sqrt(1 + Uz ** 2)
+    Uz = S[0, :, :] / S[2, :, :]
+    mag = np.sqrt(1 + Uz**2)
     U = np.stack([1 / mag, np.zeros((S.shape[1], S.shape[2])), -Uz / mag], 0)
 
     Vz = S[1, :, :] / S[2, :, :]
@@ -197,9 +198,9 @@ def applyBumpMap(S, B):
     #    - S is the original surface normal, a.k.a. k-hat -- one unit in the "z" direction.
     # Dot each of these vectors with the bump-map vector (which is in tangent space)
     # to get the i,j,k components of that same vector in world space:
-    Nx = (U[0, :, :] * B[0, :, :]) + (V[0,:, :] * B[1,:, :]) + (S[0, :, :] * B[2, :, :])
-    Ny = (U[1, :, :] * B[0, :, :]) + (V[1,:, :] * B[1,:, :]) + (S[1, :, :] * B[2, :, :])
-    Nz = (U[2, :, :] * B[0, :, :]) + (V[2,:, :] * B[1,:, :]) + (S[2, :, :] * B[2, :, :])
+    Nx = (U[0, :, :] * B[0, :, :]) + (V[0, :, :] * B[1, :, :]) + (S[0, :, :] * B[2, :, :])
+    Ny = (U[1, :, :] * B[0, :, :]) + (V[1, :, :] * B[1, :, :]) + (S[1, :, :] * B[2, :, :])
+    Nz = (U[2, :, :] * B[0, :, :]) + (V[2, :, :] * B[1, :, :]) + (S[2, :, :] * B[2, :, :])
 
     mag = np.sqrt(Nx ** 2 + Ny ** 2 + Nz ** 2)  # In theory, N is already normalized.  This guarantees it.
     # N is the surface normal vector S, with bump map B applied to it.
