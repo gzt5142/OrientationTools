@@ -129,12 +129,23 @@ def normals_by_method(DEM, cellwidth, m):
     :param m: Method
     :return: a 3D array of [band, row, col] where the bands are the x, y, and z components.
     """
-    [dx, dy] = gradient(DEM, cellwidth, method=m)
-    # save a few cycles by using the constant '1' instead of Z**2, since Z is always ones before normalizing
+    return normals(DEM, cellwidth, method=m)
+
+
+def smoothed_normals(DEM, cellwidth, m, l):
+    return normals(DEM, cellwidth, method=m, level=l)
+
+
+def normals(DEM, cellwidth, **kwargs):
+    """
+    :param DEM: 2D array of height values
+    :param cellwidth: size of one pixel in same units of height field.
+    :param kwargs: keyword args to forward to gradient
+    :return:
+    """
+    [dx, dy] = gradient(DEM, cellwidth, **kwargs)
     mag = np.sqrt(dx**2 + dy**2 + 1)
     return np.stack([-dx / mag, -dy / mag, 1 / mag], 0)
-
-
 
 def bump_extent_by_mask(maskArray, bumpMapTile):
     """
