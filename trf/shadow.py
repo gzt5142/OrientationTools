@@ -2,8 +2,16 @@
 import numpy as np
 from . import utils
 
-
 def shadowLine(d, az, el, cellwidth):
+    """
+    :param d: Height field (i.e. DEM)
+    :param az: Azimuth of light source
+    :param el: Elevation of light source
+    :param cellwidth: size of pixel in same units as DEM.
+    :return: Array, same shape as d, where 0 values are un-shadowed.  Non-zero cells are in shadow.
+             The value is the height difference between actual DEM height and the theoretical height which would
+             just peek out of shadow.
+    """
     returnArray = np.zeros(d.shape)
     lightVector = utils.lightVector(az, el)
 
