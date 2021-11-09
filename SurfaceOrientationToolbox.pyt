@@ -96,8 +96,8 @@ class Toolbox(object):
             Traditional_Hillshade,
             Traditional_Sky_Model,
             Soft_Hillshade,
-            NLCD_Bump_Mapper,
-            Prep_NLCD_Bumpmap_Mask
+            NLCD_Normal_Mapper,
+            Prep_NLCD_Normalmap_Mask
         ]
 
 
@@ -667,8 +667,8 @@ class Bump_Tool(ReliefTool):
         logger.debug("bmMaster shape is {}".format(bmMaster.shape))
         logger.debug("NLCD shape is {}".format(nlcdArray.shape))
 
-        pathPrefix = dirname(__file__) + "\\BumpMaps\\"
-        arcpy.SetProgressor("step", "Tiling Bump Map:", 0, len(t)+1, 1)
+        pathPrefix = dirname(__file__) + "\\NormalMaps\\"
+        arcpy.SetProgressor("step", "Tiling Normal Map:", 0, len(t)+1, 1)
         for (count, row) in enumerate(t):
             arcpy.SetProgressorPosition(count)
             maskValue = row[0]
@@ -696,7 +696,7 @@ class Bump_Tool(ReliefTool):
             n = np.broadcast_to(nlcdArray, (3, x, y))
             bmMaster[n == maskValue] = B[n == maskValue]
 
-        logger.debug("Master Bump Map Assembled... ")
+        logger.debug("Master Normal Map Assembled... ")
         return  bmMaster
 
     def applyBumpMap(self, S, B):
@@ -706,7 +706,7 @@ class Bump_Tool(ReliefTool):
         :return: Bumpified surface normal vectors for surface
         """
         logger = logging.getLogger(splitext(basename(__file__))[0])
-        logger.debug("Bump Map >> S shape is {}, B shape is {}".format(S.shape, B.shape))
+        logger.debug("Normal Map >> S shape is {}, B shape is {}".format(S.shape, B.shape))
         Uz = S[0, :, :] / S[2, :, :]
         mag = np.sqrt(1 + Uz ** 2)
         U = np.stack([1 / mag, np.zeros((S.shape[1], S.shape[2])), -Uz / mag], 0)
@@ -732,11 +732,11 @@ class Bump_Tool(ReliefTool):
         return np.stack([Nx / mag, Ny / mag, Nz / mag], 0)
 
 
-class NLCD_Bump_Mapper(Bump_Tool):
+class NLCD_Normal_Mapper(Bump_Tool):
     def __init__(self, **kwargs):
         super().__init__(toolname=__class__.__name__)
         self.description = self.__doc__
-        self.category = "BumpMaps"
+        self.category = "NormalMaps"
 
     def getParameterInfo(self):
         [inputDEM, lightAzimuth, lightElev, outputRaster] = super().getParameterInfo()
@@ -757,7 +757,7 @@ class NLCD_Bump_Mapper(Bump_Tool):
         vt.parameterDependencies = [inputDEM.name, nlcd.name]
         vt.columns = [
             ['GPLong', 'NLCD Code'],
-            ['GPString', 'Bumpmap Tile'],
+            ['GPString', 'Normalmap Tile'],
         ]
         vt.enabled = False
         return [inputDEM, lightAzimuth, lightElev, outputRaster, nlcd, vt]
@@ -793,7 +793,7 @@ class NLCD_Bump_Mapper(Bump_Tool):
                 params[5].filters[1].type = "ValueList"
 
                 try:
-                    dname = dirname(__file__) + "\\BumpMaps\\"
+                    dname = dirname(__file__) + "\\NormalMaps\\"
                     self.LOG.debug("Looking for bump maps in {}... ".format(dname))
                     params[5].filters[1].list = sorted([f for f in listdir(dname) if f.endswith('.tiff')])
                     self.LOG.debug("...found {}".format(len(params[5].filters[1].list)))
@@ -831,10 +831,10 @@ class NLCD_Bump_Mapper(Bump_Tool):
 
         bmMaster = self.consolidateBumpMaps(surfaceNormals.shape, nlcd, argv['lc_table'].values)
 
-        arcpy.SetProgressor("default", "Applying Assembled Bump Map ...")
+        arcpy.SetProgressor("default", "Applying Assembled Normal Map ...")
         N = self.applyBumpMap(surfaceNormals, bmMaster)
 
-        self.LOG.debug(" ...Shading Bumpmapped normal field")
+        self.LOG.debug(" ...Shading normal field")
         bmHS = shader.lambert(N, L)  # output is -1 to 1
         bmHS = (bmHS + 1) / 2  # scale to fit 0-1 range
         bmHS = bmHS[0:xDim, 0:yDim]
@@ -846,11 +846,11 @@ class NLCD_Bump_Mapper(Bump_Tool):
         return
 
 
-class Prep_NLCD_Bumpmap_Mask(ReliefTool):
+class Prep_NLCD_Normalmap_Mask(ReliefTool):
     def __init__(self):
         super().__init__(toolname=__class__.__name__)
         self.description = self.__doc__
-        self.category = "BumpMaps"
+        self.category = "NormalMaps"
 
     def getParameterInfo(self):
         [inputDEM, _, _, outputRaster] = super().getParameterInfo()
