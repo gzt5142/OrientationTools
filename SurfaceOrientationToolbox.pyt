@@ -93,8 +93,8 @@ class Toolbox(object):
         self.alias = ''.join(filter(str.isalpha, splitext(basename(__file__))[0]))
         self.tools = [
             Study_DEM,
-            Traditional_Hillshade,
-            Traditional_Sky_Model,
+            Hard_Hillshade,
+            Sky_Model,
             Soft_Hillshade,
             NLCD_Normal_Mapper,
             Prep_NLCD_Normalmap_Mask
@@ -345,7 +345,7 @@ class Study_DEM(ReliefTool):
         return
 
 
-class Traditional_Hillshade(ReliefTool):
+class Hard_Hillshade(ReliefTool):
     """
     Clamps output of the Lambertian shader to [0..255], just as the traditional hillshade from Esri, Grass, GDAL, etc.
     Unlike pure Lambert, this output is unsigned bytes (uint8) to match what others produce.
@@ -587,7 +587,7 @@ class Sky_Tool(ReliefTool):
         return outputArray
 
 
-class Traditional_Sky_Model(Sky_Tool):
+class Sky_Model(Sky_Tool):
     """
     Kennelly, P. J., & Stewart, A. J. (2014). General sky models for illuminating terrains. International Journal
     of Geographical Information Science, 28(2), 383–406. https://doi.org/10.1080/13658816.2013.848985

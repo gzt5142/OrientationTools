@@ -15,12 +15,11 @@
   The output from `Study DEM` will be input for the following tools: 
   
 * _<u>Shaded Relief</u>_ ToolSet
-    * __Traditional Hillshade__ -- Produces a hillshade layer similar to that produced by other major players (Esri,
-      GDAL, GRASS, etc). Output is unsigned integers from the range 0 to 255. All negative values from the Lambertian
+    * __Hard Hillshade__ -- Produces a hillshade layer similar to that produced by other major players (Esri,
+      GDAL, GRASS, etc). Output is clampted to unsigned integers from the range 0 to 255. 
+      All negative values from the Lambertian
       shader are reset to zero for the traditional output. Option for shadows to be modeled. Any cell found to be in
       shadow is set to brightness value zero.
-    * __Traditional Sky Model__ -- Massively multi-directional hillshade; several hundred light sources supported. 
-      This implementation is based on a traditional hillshade using output cast as 8-bit integers. 
     * __Soft Hillshade__ -- Produces a hillshade layer with shade values as floating point numbers from zero to one. 
       This output includes the entire range of output from Lambert (-1 to 1), but re-scales it to a 'normalized'
       range from zero to one.  In this output, values between 0 and 0.5 represent 'hidden' or 'self-shaded' areas
@@ -36,11 +35,13 @@
         A style file is included in the repository which defines an '80-20' and a '70-30' color ramp for soft shaded
         scenes using this tool.  Ensure your stretch type is 'Min-Max' with the minimum set to zero and the maximum 
         set to one. 
-* _<u>Bumpmaps</u>_ ToolSet
-    * __NLCD_Bump_Mapper__ -- Configures and applies bump-map tiles according to a land use raster mask. The 
+    * __Sky Model__ -- Massively multi-directional hillshade; several hundred light sources supported. 
+      This implementation is based on a hard hillshade using output cast as 8-bit integers. 
+* _<u>NormalMaps</u>_ ToolSet
+    * __NLCD_Normal_Mapper__ -- Configures and applies bump-map tiles according to a land use raster mask. The 
       use-case was built around land cover, which is why *NLCD* terminology is used. The bump-mapper expects 
       the NLCD masking raster to have same cell size, extent, dimensions, and projection as the terrain raster.
-    * __Prep_NLCD_Bumpmap_Mask__ -- This tool helps to clip, resample, and re-project NLCD or similar raster data to
+    * __Prep_NLCD_Normalmap_Mask__ -- This tool helps to clip, resample, and re-project NLCD or similar raster data to
       match the surface normal dataset.
       
 
@@ -49,12 +50,12 @@ Options for all Surface Normal Tools:
   set to <u>True</u>, debug information is accumulated in a log file in the same folder/directory
   as the toolbox source file.
   
-### Bump Maps
-The bump-mapping tool searches the `BumpMaps` folder for the tiles it offers for you to use in texturing 
-a scene. You can add bump maps to this foldor *prior* to running the tool to give yourself more options. 
+### Normal Maps
+The bump-mapping tool searches the `NormalMaps` folder for the tiles it offers for you to use in texturing 
+a scene. You can add normal maps to this foldor *prior* to running the tool to give yourself more options. 
 You can create your own bump-map tiles, or download most any normal map from on-line archives. 
 The libraries at https://polyhaven.com/textures and https://ambientcg.com/ are popular repositories of 
-public-domain textures. 
+public-domain textures. The Normal-Mapper tool recognizes tiff files only (and must be named with .tiff extension).
 
 ### Sky Config Files
 The configuration files in the `SkyConfigFiles` folder provide the options for sky configurations in the
