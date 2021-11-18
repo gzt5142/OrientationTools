@@ -8,6 +8,7 @@ version 2.7.  If you are using an earlier version of Pro, you will need to clone
 Pillow package manually. 
 
 
+### Toolbox Contents
 
 * __Study DEM__ -- Tool to process DEM inputs and generate the multi-band raster dataset representing the surface normal 
   vectors used by all of the tools listed below.  Surface normal vectors are derived from gradient obtained via 
