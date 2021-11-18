@@ -3,6 +3,12 @@
 
 ### Python Toolbox for ArcGIS Pro: Surface Orientation Toolbox
 
+NOTE: This toolbox requires the Pillow image processing package.  Pillow is included in the ArcGIS Pro distribution as of
+version 2.7.  If you are using an earlier version of Pro, you will need to clone your python environment and install the
+Pillow package manually. 
+
+
+
 * __Study DEM__ -- Tool to process DEM inputs and generate the multi-band raster dataset representing the surface normal 
   vectors used by all of the tools listed below.  Surface normal vectors are derived from gradient obtained via 
   a Sobel operator.  The output from this tool should be placed in a geodatabase.  It will be a 4-band raster,
