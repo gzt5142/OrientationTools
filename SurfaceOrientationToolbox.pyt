@@ -323,7 +323,7 @@ class Study_DEM(ReliefTool):
 
         Nx = arcpy.NumPyArrayToRaster(sn[0, :, :], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
         Ny = arcpy.NumPyArrayToRaster(sn[1, :, :], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
-        Nz = arcpy.NumPyArrayToRaster(sn[1, :, :], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
+        Nz = arcpy.NumPyArrayToRaster(sn[2, :, :], tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
         elev = arcpy.NumPyArrayToRaster(elevArray, tmpCorner, demInfo.meanCellWidth, demInfo.meanCellHeight)
 
         self.LOG.debug("Composite to Multi-Band {}".format(basename(argv['output'].valueAsText)))
