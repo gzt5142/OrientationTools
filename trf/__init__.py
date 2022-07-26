@@ -1,4 +1,0 @@
-# TuRF
-# Terrain Raster Functions
-#
-#
